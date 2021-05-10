@@ -52,5 +52,5 @@ This imports a dataset using python and manipulates it. We can then use R to gra
 ```{R}
 ggplot(py$flights, aes(carrier, arr_delay)) + geom_point() + geom_jitter()
 ```
-Overall, both python and R have their individual benefits, but using pacakges like reticulate can help bring both together!
+Overall, both python and R have their individual benefits, but using packages like reticulate can help bring both together!
 
