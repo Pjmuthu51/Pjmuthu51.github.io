@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="Pragat Jay Muthu" />
+    
+    <link rel="shortcut icon" type="image/x-icon" href="../../img/favicon.ico">
+    <title>Project 1</title>
+    <meta name="generator" content="Hugo 0.83.1" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="../../css/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,400,200bold,400old" />
+    
+    <!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+    
+  </head>
+
+  <body>
+    <div id="wrap">
+      
+      <nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="../../"><i class="fa fa-home"></i></a>
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <div class="navbar-collapse collapse" id="navbar">
+      <ul class="nav navbar-nav navbar-right">
+      
+        
+        <li><a href="../../post/">BLOG</a></li>
+        
+        <li><a href="../../projects/">PROJECTS</a></li>
+        
+        <li><a href="../../resume/">RESUME</a></li>
+        
+      
+      </ul>
+    </div>
+  </div>
+</nav>
+
+      <div class="container">
+        <div class="blog-post">
+          <h3>
+            <strong><a href="../../project/project1/">Project 1</a></strong>
+          </h3>
+        </div>
+ 
+<div class="blog-title">
+          <h4>
+         January 1, 0001 
+            &nbsp;&nbsp;
+            
+          </h4>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-body">
+            <div class="blogpost">
+              
+
+
+<div id="project-1" class="section level1">
+<h1>Project 1</h1>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p><strong>Currently, we are living in a world of open data. Alongside this, we are living in a pandemic. I was curious how I could access COVID-19 data and use it for this project. I was mainly curious to see the levels of cases and fatalities, especially in conjunction with the release of the vaccine and its recent access expansion. I would hopefully like to see a general decrease in cases as people become more careful and as more people get/recover from having it. The beginning of vaccination should also hopefully show another period of numbers dropping, which should continue as more people become vaccinated. It would also be interesting to see when there are COVID-19 peaks and correlating them with whatever events are occurring.</strong></p>
+<p><strong>Since we are living in Texas, I pulled various public datasets from our government websites. These datasets are all hosted and sponsored by the government and are publicly available. These datasets are mainly one variable, including population, total cases, active cases, and fatalities all by Texas’ county, daily over the pandemic period. The common variable between the datasets is that they are separated into each Texas county.</strong></p>
+</div>
+<div id="joining" class="section level2">
+<h2>Joining</h2>
+<pre class="r"><code>library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+
+
+setwd(&quot;~/my stuff/website/content/project&quot;)
+
+population &lt;- read.csv(&quot;2019_txpopest_county.csv&quot;)
+
+Active_Cases &lt;- read_excel(&quot;Texas COVID-19 Active Case Data by County.xlsx&quot;)
+
+Total_Cases &lt;- read_excel(&quot;Texas COVID-19 Case Count Data by County.xlsx&quot;)
+
+Fatalities &lt;- read_excel(&quot;Texas COVID-19 Fatality Count Data by County.xlsx&quot;)
+
+
+pop_2020 &lt;- population %&gt;% select(county, jan1_2020_pop_est) %&gt;% 
+    filter(county != &quot;State of Texas&quot;) %&gt;% mutate(county = tolower(county))
+
+Active_Cases &lt;- Active_Cases %&gt;% na.omit() %&gt;% rename(county = 1) %&gt;% 
+    filter(county != &quot;County&quot;) %&gt;% mutate(county = tolower(county))
+
+Longer_Active_cases &lt;- Active_Cases %&gt;% pivot_longer(contains(&quot;-&quot;)) %&gt;% 
+    separate(name, into = c(&quot;Month&quot;, &quot;Day&quot;), sep = &quot;-&quot;) %&gt;% select(-&quot;Day&quot;) %&gt;% 
+    mutate(Month = recode(Month, `12` = &quot;Dec&quot;, `01` = &quot;Jan&quot;, 
+        `02` = &quot;Feb&quot;, `03` = &quot;Mar&quot;)) %&gt;% mutate(cases = value) %&gt;% 
+    group_by(county, Month) %&gt;% summarise(mean_month_active = mean(cases)) %&gt;% 
+    mutate_if(is.numeric, round, 3)
+
+Fatalities &lt;- Fatalities %&gt;% na.omit() %&gt;% rename(county = 1) %&gt;% 
+    filter(county != &quot;County Name&quot;) %&gt;% filter(county != &quot;Total&quot;) %&gt;% 
+    filter(county != &quot;UNKNOWN&quot;) %&gt;% mutate(county = tolower(county))
+
+Longer_Fatalities &lt;- Fatalities %&gt;% pivot_longer(contains(&quot;-&quot;)) %&gt;% 
+    separate(name, into = c(&quot;Month&quot;, &quot;Day&quot;), sep = &quot;-&quot;) %&gt;% select(-&quot;Day&quot;) %&gt;% 
+    mutate(Month = recode(Month, `12` = &quot;Dec&quot;, `01` = &quot;Jan&quot;, 
+        `02` = &quot;Feb&quot;, `03` = &quot;Mar&quot;)) %&gt;% mutate(cases = value) %&gt;% 
+    group_by(county, Month) %&gt;% summarise(month_fatal = sum(cases)) %&gt;% 
+    mutate_if(is.numeric, round, 3)
+
+Total_Cases &lt;- Total_Cases %&gt;% na.omit() %&gt;% rename(county = 1) %&gt;% 
+    filter(county != &quot;County Name&quot;) %&gt;% filter(county != &quot;Total&quot;) %&gt;% 
+    mutate(county = tolower(county))
+
+Longer_Total &lt;- Total_Cases %&gt;% pivot_longer(contains(&quot;-&quot;)) %&gt;% 
+    separate(name, into = c(&quot;Month&quot;, &quot;Day&quot;), sep = &quot;-&quot;) %&gt;% select(-&quot;Day&quot;) %&gt;% 
+    mutate(Month = recode(Month, `12` = &quot;Dec&quot;, `01` = &quot;Jan&quot;, 
+        `02` = &quot;Feb&quot;, `03` = &quot;Mar&quot;)) %&gt;% mutate(cases = value) %&gt;% 
+    group_by(county, Month) %&gt;% summarise(month_total = max(cases)) %&gt;% 
+    mutate_if(is.numeric, round, 3)
+
+Joined &lt;- left_join(Longer_Active_cases, Longer_Total, by = c(&quot;county&quot;, 
+    &quot;Month&quot;))
+Joined &lt;- left_join(Joined, Longer_Fatalities, by = c(&quot;county&quot;, 
+    &quot;Month&quot;))
+Joined &lt;- left_join(Joined, pop_2020, by = c(&quot;county&quot;))
+Joined &lt;- Joined %&gt;% na.omit()</code></pre>
+<p><strong>First, I pulled the datasets from their various locations. Then I set up the variables of each dataset so that I could proceed with joining. I chose to use the left join for multiple reasons. For the first join, there was not an important dataset but the left join was able to join the total cases to the active cases. I did this by both month and county so that no data would be mis-joined. After this first join, I used left join to make the Joined database the important database in which everything should match. Finally, with the last join, I removed the by month as the population data set did not include a by month population. Dewitt County was dropped through the process as they were missing a lot of data for the various variables causing a lot of issues below.</strong></p>
+</div>
+<div id="tidying" class="section level2">
+<h2>Tidying</h2>
+<p><strong>The code for the tidying aspect can be found in the Joining section as I did them together. I pivoted_longer to make the data tidy. Originally, there was a column for each date the data was taken. Pivot longer allowed it to have a row for each county and within each county each date the data counted. Then I removed the day data, grouped by county and month, and then averaged the data by month within each county. This way we can see the average monthly statistic for each of the variables. I also tidied further down in order to access variables and work on different datasets for different purposes</strong></p>
+</div>
+<div id="wrangling" class="section level2">
+<h2>Wrangling</h2>
+<pre class="r"><code>Joined &lt;- Joined %&gt;% group_by(county, Month) %&gt;% mutate(Uninfected = jan1_2020_pop_est - 
+    month_total) %&gt;% mutate(recovered = month_total - mean_month_active - 
+    month_fatal)
+
+Joined %&gt;% group_by(county) %&gt;% select(-month_total) %&gt;% summarise_if(is.numeric, 
+    list(Mean = mean), na.rm = T) %&gt;% arrange(desc(mean_month_active_Mean)) %&gt;% 
+    filter(mean_month_active_Mean &gt; median(mean_month_active_Mean))</code></pre>
+<pre><code>## # A tibble: 126 x 6
+##    county mean_month_acti… month_fatal_Mean jan1_2020_pop_e… Uninfected_Mean
+##    &lt;chr&gt;             &lt;dbl&gt;            &lt;dbl&gt;            &lt;dbl&gt;           &lt;dbl&gt;
+##  1 tarra…           31116.           58111           2063496        1880516 
+##  2 harris           29237.          118426           4703708        4386180.
+##  3 dallas           24022.           78940.          2647627        2424375 
+##  4 el pa…           22550.           58513.           851888         735892.
+##  5 montg…           17698.           10150.           609172         576218.
+##  6 bexar            17684.           66834.          2006193        1862482 
+##  7 denton           12356.           14206.           904005         860105.
+##  8 fort …           11018.           13146            818912         773814.
+##  9 galve…            4758.            7744.           341146         314287.
+## 10 smith             4116.            9390.           232675         222839.
+## # … with 116 more rows, and 1 more variable: recovered_Mean &lt;dbl&gt;</code></pre>
+<pre class="r"><code>Joined %&gt;% group_by(county) %&gt;% select(-month_total) %&gt;% summarise_if(is.numeric, 
+    list(SD = sd), na.rm = T) %&gt;% arrange(desc(mean_month_active_SD)) %&gt;% 
+    filter(mean_month_active_SD &gt; median(mean_month_active_SD)) %&gt;% 
+    select(-jan1_2020_pop_est_SD)</code></pre>
+<pre><code>## # A tibble: 126 x 5
+##    county     mean_month_active_SD month_fatal_SD Uninfected_SD recovered_SD
+##    &lt;chr&gt;                     &lt;dbl&gt;          &lt;dbl&gt;         &lt;dbl&gt;        &lt;dbl&gt;
+##  1 tarrant                  16155.         18535.        37640.       33587.
+##  2 el paso                  15646.         12500.        13120.       25995.
+##  3 dallas                   12243.         23713.        36498.       28928.
+##  4 harris                   11966.         31363.        58505.       43986.
+##  5 bexar                     9346.         20190.        34372.       26062.
+##  6 montgomery                5932.          3070.         7071.        2294.
+##  7 webb                      2468.          4448.         7661.        5610.
+##  8 ector                     2179.          1866.         1065.        1977.
+##  9 denton                    2023.          4713.         9176.        6434.
+## 10 fort bend                 1887.          3315.         9466.        6891.
+## # … with 116 more rows</code></pre>
+<pre class="r"><code>Joined %&gt;% group_by(county) %&gt;% select(-month_total) %&gt;% summarise_if(is.numeric, 
+    list(Var = var), na.rm = T) %&gt;% arrange(desc(mean_month_active_Var)) %&gt;% 
+    filter(mean_month_active_Var &gt; median(mean_month_active_Var)) %&gt;% 
+    select(-jan1_2020_pop_est_Var) %&gt;% mutate_if(is.numeric, 
+    round, 3)</code></pre>
+<pre><code>## # A tibble: 126 x 5
+##    county     mean_month_active_Var month_fatal_Var Uninfected_Var recovered_Var
+##    &lt;chr&gt;                      &lt;dbl&gt;           &lt;dbl&gt;          &lt;dbl&gt;         &lt;dbl&gt;
+##  1 tarrant               260994915.      343551822     1416772045.   1128117387.
+##  2 el paso               244812024.      156249933.     172147194.    675725579.
+##  3 dallas                149898818.      562297183     1332101181.    836805182.
+##  4 harris                143192086.      983615461.    3422825494.   1934759917.
+##  5 bexar                  87342437.      407642077.    1181406301.    679231950.
+##  6 montgomery             35184133.        9426224.      50000548.      5261866.
+##  7 webb                    6091913.       19786481.      58696316.     31477492.
+##  8 ector                   4746353.        3482460.       1134430.      3909697.
+##  9 denton                  4093389.       22210480.      84201935.     41395648.
+## 10 fort bend               3561255.       10990918       89603163      47488799.
+## # … with 116 more rows</code></pre>
+<pre class="r"><code>Joined %&gt;% group_by(county) %&gt;% select(-month_total) %&gt;% summarise_if(is.numeric, 
+    list(IQR = IQR), na.rm = T) %&gt;% arrange(desc(mean_month_active_IQR)) %&gt;% 
+    filter(mean_month_active_IQR &gt; median(mean_month_active_IQR)) %&gt;% 
+    select(-jan1_2020_pop_est_IQR)</code></pre>
+<pre><code>## # A tibble: 126 x 5
+##    county     mean_month_active_IQR month_fatal_IQR Uninfected_IQR recovered_IQR
+##    &lt;chr&gt;                      &lt;dbl&gt;           &lt;dbl&gt;          &lt;dbl&gt;         &lt;dbl&gt;
+##  1 el paso                   22970.          16003.         14934.        30042.
+##  2 dallas                    12701.          18520          34066.        34478.
+##  3 tarrant                   11906.          12548.         34475         39418.
+##  4 harris                    11720.          24086          58918         47318.
+##  5 montgomery                 7469.           1980.          6927.         1493.
+##  6 bexar                      6818.          14298.         36140.        29715.
+##  7 denton                     3351.           2780.         10093.         5523.
+##  8 galveston                  3054.           1305.          5359.         3324.
+##  9 fort bend                  2818.           2858.          9986          7801.
+## 10 lubbock                    2576.           5408.          2602.         2175.
+## # … with 116 more rows</code></pre>
+<pre class="r"><code>temp &lt;- Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% filter(mean_month_active == 
+    max(mean_month_active)) %&gt;% select(county)
+
+Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% summarise(max(mean_month_active)) %&gt;% 
+    left_join(temp)</code></pre>
+<pre><code>## # A tibble: 4 x 3
+##   Month `max(mean_month_active)` county    
+##   &lt;chr&gt;                    &lt;dbl&gt; &lt;chr&gt;     
+## 1 Dec                     35909. el paso   
+## 2 Feb                     32285. harris    
+## 3 Jan                     49376. tarrant   
+## 4 Mar                     22586. montgomery</code></pre>
+<pre class="r"><code>temp2 &lt;- Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% filter(month_fatal == 
+    max(month_fatal)) %&gt;% select(county)
+
+Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% summarise(max(month_fatal)) %&gt;% 
+    left_join(temp2)</code></pre>
+<pre><code>## # A tibble: 4 x 3
+##   Month `max(month_fatal)` county
+##   &lt;chr&gt;              &lt;dbl&gt; &lt;chr&gt; 
+## 1 Dec                73392 harris
+## 2 Feb               145376 harris
+## 3 Jan               131528 harris
+## 4 Mar               123408 harris</code></pre>
+<pre class="r"><code>temp3 &lt;- Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% filter(recovered == 
+    max(recovered)) %&gt;% select(county)
+
+Joined %&gt;% group_by(Month) %&gt;% arrange(Month) %&gt;% summarise(max(recovered)) %&gt;% 
+    left_join(temp3)</code></pre>
+<pre><code>## # A tibble: 4 x 3
+##   Month `max(recovered)` county
+##   &lt;chr&gt;            &lt;dbl&gt; &lt;chr&gt; 
+## 1 Dec            137064. harris
+## 2 Feb            171187. harris
+## 3 Jan            139608. harris
+## 4 Mar            231599. harris</code></pre>
+<p><strong>I wanted to view the main statistics across the various variables to determine what might be a significant set of statistics to look at. It showed that the largest amount of active cases overall was found in Tarrant county, which surprised me as I would think that the county with the largest population would have the largest amount of cases. However, Harris county, with a population double of Tarrant, had less cases overall. This shows that something in Tarrant county occurred over this 4 month period in which COVID-19 numbers increased disproportionately to its population size. There was also a large amount of deviation between the months in these larger counties(Harris, Dallas, El Paso, and Tarrant), which makes sense as larger populations may have different peaks according to the events that occurred in their vicinity. Finally, I was curious as to see which counties had the highest active cases in a given month. In December, it was El Paso. In January, it was Tarrant. In February, it was Harris county and in March it was Montgomery. Interestingly enough, no county held the max average active cases for more than one month. This could be due to safety protocols being implemented or people being more conscious due to their county having the most active cases in the previous month. Harris county had the most amount of fatalities each month while also having the largest number of recoveries each month as well, which makes sense as they are the largest county.</strong></p>
+</div>
+<div id="visualization" class="section level2">
+<h2>Visualization</h2>
+<div id="correlation-map" class="section level3">
+<h3>Correlation Map</h3>
+<pre class="r"><code>cor &lt;- Joined %&gt;% ungroup() %&gt;% select(-county) %&gt;% mutate(Month = recode(Month, 
+    Dec = &quot;00&quot;, Jan = &quot;01&quot;, Feb = &quot;02&quot;, Mar = &quot;03&quot;)) %&gt;% mutate(Month = as.numeric(Month)) %&gt;% 
+    cor(use = &quot;pair&quot;)
+
+cor %&gt;% as.data.frame %&gt;% rownames_to_column %&gt;% pivot_longer(-1) %&gt;% 
+    ggplot(aes(rowname, name, fill = value)) + geom_tile() + 
+    scale_fill_gradient2(low = &quot;red&quot;, high = &quot;green&quot;) + geom_text(aes(label = round(value, 
+    2)), color = &quot;black&quot;, size = 2.5) + xlab(&quot;&quot;) + ylab(&quot;&quot;) + 
+    theme(axis.text.x = element_text(size = 9, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 8)) + coord_fixed() + 
+    ggtitle(&quot;Correlation Between COVID-19 Statistics within Texas Counties&quot;) + 
+    theme(plot.title = element_text(hjust = 0.5))</code></pre>
+<p><img src="../../project/project1_files/figure-html/3-1.png" width="672" style="display: block; margin: auto;" />
+<strong>When looking at the correlation map, some of the variables that the correlations don’t matter show that there is a lack of correlation. However, when looking specifically at various different correlations, those do make sense. The population size generally correlates with the various numbers. Larger populations are showing larger amounts of active cases, fatalities, total cases, and higher levels of both recovered and uninfected individuals. This makes sense as a larger population would have larger amount of individuals getting COVID-19 (the active cases) and therefore more fatalities/recovered cases. This type of logical correlation is confirmed with other correlations, such as active cases and fatalities as the more actives cases there are, the more fatalities are expected. What was slightly surprising was the lower strength in correlation between active cases and recovered cases. This may due to the less data used or there may be other methods in which recovery is being measured that might not show correlations, such as not all recovery data is being received. Similarly, there is a 0 correlation with month and other variables. At first you would think there would be corelation, however, there were peaks and dips in the cases over these four months. With more time, we may see a correlation with month and the variables. </strong></p>
+</div>
+<div id="plots-of-monthly-cases" class="section level3">
+<h3>Plots of Monthly Cases</h3>
+<pre class="r"><code>Joined_Large &lt;- Joined %&gt;% filter(jan1_2020_pop_est &gt; 5e+05)
+
+Joined_Large %&gt;% ggplot(aes(Month, mean_month_active, color = county)) + 
+    geom_point() + geom_line(aes(group = county)) + scale_x_discrete(name = &quot;Month&quot;, 
+    limits = c(&quot;Dec&quot;, &quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;)) + scale_y_continuous(limits = c(0, 
+    50000), breaks = seq(0, 50000, 5000)) + ylab(&quot;Average Monthly Active Cases&quot;) + 
+    ggtitle(&quot;Monthly Active Cases Across Counties with a Population&gt;.5 Million Individuals&quot;) + 
+    theme_minimal()</code></pre>
+<p><img src="../../project/project1_files/figure-html/4-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>Joined %&gt;% group_by(county) %&gt;% ggplot(aes(Month, mean_month_active)) + 
+    geom_bar(stat = &quot;summary&quot;, fun = mean, fill = &quot;#ADD8E6&quot;) + 
+    scale_x_discrete(name = &quot;Month&quot;, limits = c(&quot;Dec&quot;, &quot;Jan&quot;, 
+        &quot;Feb&quot;, &quot;Mar&quot;)) + ylab(&quot;Total Average Monthly Active Cases&quot;) + 
+    ggtitle(&quot;Average Monthly Active Cases per County&quot;)</code></pre>
+<p><img src="../../project/project1_files/figure-html/4-2.png" width="672" style="display: block; margin: auto;" />
+<strong>This was an interesting set of plots to do as I was able to see the trends in cases overall and within the larger counties. You can see on the bar graph that there was a peak in cases in general across Texas in January. This trend was mimicked in the plot that showed the county levels. Earlier in the summary data, we saw that El Paso had the highest level of cases in December, Tarrant county in January, Harris in February, and Montgomery in March. This was shown here as well but we can also see the gaps in between the counties and how in general after January, the levels have been decreasing. I think this is both due to the recovered individuals possessing antibodies for COVID-19 but also with the increase in vaccination/consciousness levels are also decreasing.</strong></p>
+</div>
+<div id="plots-of-average-fatalities-vs-active-cases-vs-recovered-cases-by-month-for-texas" class="section level3">
+<h3>Plots of Average Fatalities vs Active cases vs recovered cases by Month for Texas</h3>
+<pre class="r"><code>Joined %&gt;% select(Month, month_fatal, mean_month_active, recovered) %&gt;% 
+    pivot_longer(cols = c(month_fatal, mean_month_active, recovered), 
+        names_to = &quot;Legend&quot;) %&gt;% ggplot() + geom_bar(aes(x = Month, 
+    y = value, fill = Legend), stat = &quot;summary&quot;, fun = mean, 
+    alpha = 0.5, position = &quot;dodge&quot;) + theme_minimal() + ylab(&quot;Cases&quot;) + 
+    scale_x_discrete(name = &quot;Month&quot;, limits = c(&quot;Dec&quot;, &quot;Jan&quot;, 
+        &quot;Feb&quot;, &quot;Mar&quot;)) + ggtitle(&quot;Fatalities vs Active Cases vs Recoveries&quot;)</code></pre>
+<p><img src="../../project/project1_files/figure-html/5-1.png" width="672" style="display: block; margin: auto;" />
+<strong>This plot showed the difference in the active cases per month, but with comparison to the deaths occurring and the recoveries happening. It was interesting to see how that directly the active cases dropping was due to increases in recovery and fatalities. There was a massive drop in active cases between February and March. This, when looking at both recoveries and fatalities, was directly correlated to a massive increase in recoveries, but also a significant amount of fatalities. On the other hand, we can also see how there was a massive up tick in fatalities that went along with the massive increase in active cases in January. You can also see an increase in both fatalities and recoveries in February, which could be due to delayed recoveries and fatalities occurring after the spike in cases.</strong></p>
+</div>
+</div>
+<div id="dimensionality-reduction" class="section level2">
+<h2>Dimensionality Reduction</h2>
+<div id="pca-prep" class="section level3">
+<h3>PCA Prep</h3>
+<pre class="r"><code>Joined_Prep &lt;- Joined %&gt;% ungroup() %&gt;% filter(Month == &quot;Jan&quot;)
+Joined_Prep[is.na(Joined_Prep)] = 0
+joined_num &lt;- Joined_Prep %&gt;% select_if(is.numeric, na.rm = T) %&gt;% 
+    scale
+rownames(joined_num) &lt;- Joined_Prep$county
+joined_pca &lt;- princomp(joined_num)</code></pre>
+</div>
+<div id="determining-number-of-pc-clusters" class="section level3">
+<h3>Determining number of PC clusters</h3>
+<pre class="r"><code>eigval &lt;- joined_pca$sdev^2
+varprop = round(eigval/sum(eigval), 2)
+ggplot() + geom_bar(aes(y = varprop, x = 1:6), stat = &quot;identity&quot;) + 
+    xlab(&quot;&quot;) + geom_path(aes(y = varprop, x = 1:6)) + geom_text(aes(x = 1:6, 
+    y = varprop, label = round(varprop, 2)), vjust = 1, col = &quot;orange&quot;, 
+    size = 5) + scale_y_continuous(breaks = seq(0, 0.6, 0.2), 
+    labels = scales::percent) + scale_x_continuous(breaks = 1:10) + 
+    ggtitle(&quot;Scree Plot for PCA of Joined Data&quot;) + theme(plot.title = element_text(hjust = 0.5)) + 
+    xlab(&quot;Principal Component&quot;) + ylab(&quot;Percentage of Variance Accounted For&quot;)</code></pre>
+<p><img src="../../project/project1_files/figure-html/7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>eigval</code></pre>
+<pre><code>##       Comp.1       Comp.2       Comp.3       Comp.4       Comp.5       Comp.6 
+## 5.575793e+00 2.199787e-01 1.440984e-01 3.641463e-02 1.200429e-15 4.280073e-16</code></pre>
+</div>
+<div id="pc-plots" class="section level3">
+<h3>PC Plots</h3>
+<pre class="r"><code>PCAplot &lt;- Joined %&gt;% ungroup() %&gt;% select_if(is.numeric, na.rm = T)
+temporary &lt;- Joined %&gt;% filter(Month == &quot;Jan&quot;) %&gt;% ungroup() %&gt;% 
+    select(county)
+joined_pca$scores %&gt;% as.data.frame() %&gt;% cbind.data.frame(temporary) %&gt;% 
+    mutate(PC1 = joined_pca$scores[, 1], PC2 = joined_pca$scores[, 
+        2]) %&gt;% ggplot(aes(PC1, PC2)) + geom_point() + coord_fixed() + 
+    ggtitle(&quot;PC Plot of Relevant Principal Components in COVID-19 Data&quot;) + 
+    theme(plot.title = element_text(hjust = 0.5)) + xlab(&quot;PC1 Score&quot;) + 
+    ylab(&quot;PC2 Score&quot;)</code></pre>
+<p><img src="../../project/project1_files/figure-html/8-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code># highest/lowest on Pc 1/2
+joined_pca$scores[, 1:2] %&gt;% as.data.frame %&gt;% top_n(3, Comp.1)</code></pre>
+<pre><code>##           Comp.1     Comp.2
+## dallas  16.20084 -0.6830203
+## harris  24.61597 -2.3023811
+## tarrant 13.72516  1.3514352</code></pre>
+<pre class="r"><code>joined_pca$scores[, 1:2] %&gt;% as.data.frame %&gt;% top_n(-3, Comp.1)</code></pre>
+<pre><code>##            Comp.1      Comp.2
+## kenedy -0.6478134 -0.07381065
+## king   -0.6484013 -0.07882739
+## loving -0.6491785 -0.07887600</code></pre>
+<pre class="r"><code>joined_pca$scores[, 1:2] %&gt;% as.data.frame %&gt;% top_n(3, Comp.2)</code></pre>
+<pre><code>##           Comp.1   Comp.2
+## cameron 1.905952 1.610775
+## el paso 7.407795 4.457147
+## hidalgo 3.163396 3.067936</code></pre>
+<pre class="r"><code>joined_pca$scores[, 1:2] %&gt;% as.data.frame %&gt;% top_n(-3, Comp.2)</code></pre>
+<pre><code>##           Comp.1    Comp.2
+## collin  4.473645 -1.855871
+## harris 24.615970 -2.302381
+## travis  5.251271 -1.905728</code></pre>
+</div>
+<div id="loading-plots" class="section level3">
+<h3>Loading Plots</h3>
+<pre class="r"><code>library(ggrepel)
+joined_pca$loadings[1:6, 1:2] %&gt;% as.data.frame %&gt;% rownames_to_column %&gt;% 
+    ggplot() + geom_hline(aes(yintercept = 0), lty = 2) + geom_vline(aes(xintercept = 0), 
+    lty = 2) + ylab(&quot;PC2&quot;) + xlab(&quot;PC1&quot;) + geom_segment(aes(x = 0, 
+    y = 0, xend = Comp.1, yend = Comp.2), arrow = arrow(), col = &quot;red&quot;) + 
+    geom_label_repel(aes(x = Comp.1, y = Comp.2, label = rowname)) + 
+    ggtitle(&quot;PCA Plot of Loadings for Relevant Principal Components&quot;) + 
+    theme(plot.title = element_text(hjust = 0.5))</code></pre>
+<p><img src="../../project/project1_files/figure-html/9-1.png" width="672" style="display: block; margin: auto;" /></p>
+</div>
+<div id="interpretation" class="section level3">
+<h3>Interpretation</h3>
+<p><strong>When looking at the Scree plot, we notice that about 93% of the variation in the data was due to PC1. This is confirmed and shows up in the loading plot. We can see how all of the arrow are skewed towards PC1. PC1 acts as a combination of the variables that are found in PC1. What this means that if you have a high PC1, we should see a large amount within the variables that follow within PC1. Similarly, low PC1 scores also show lower numbers with each of the variables. This is confirmed with the correlation plot showing that majority of the variables are highly positively correlated with each of the other variables. This also confirms that 1 PC is enough through the highly positive correlation. We see earlier when looking at the counties with the highest PC1 are also the ones with the highest populations. This also was shown earlier in how higher populations tend to have higher active cases, fatalities, recovered individuals, etc.</strong></p>
+</div>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p><strong>In conclusion, the data was very interesting to play with. I would have liked to explore it more to attempt to create more interesting plots and conclusions. We found out that Tarrant county had more overall active cases, even though Harris county had more than double its population. We found out that Harris county showed both the highest number of Fatalities and recoveries, which makes sense as it has the largest population. Through the graphs, we were able to see visualizations of some of the summary data, such as the levels of active cases as a result to the counties’ individual active case levels, and showing the effects of recovery/fatalities on the overall active case levels over time. Finally with the PCA data, we confirm that one cluster is enough due to the high correlation between the variables. These datas and outcomes could be further explored in a future study where the levels of each variable are shown relative to their population sizes, indicating if there is other possible explanations for the variables outside of population. I would also like to incorporate the vaccination records in a future study as well.</strong></p>
+</div>
+</div>
+
+            
+        <hr>         <div class="related-posts">
+                <h5>Related Posts</h5>
+                
+              </div> 
+            </div>
+          </div>
+
+   <hr>  <div class="disqus">
+  <div id="disqus_thread"></div>
+  <script type="text/javascript">
+
+    (function() {
+      
+      
+      if (window.location.hostname == "localhost")
+        return;
+
+      var disqus_shortname = '';
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+  </script>
+  <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  <a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div> 
+        </div>
+      </div>
+    </div>
+
+    
+    <footer>
+  <div id="footer">
+    <div class="container">
+      <p class="text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io/">Hugo</a> and
+      <a href="http://www.github.com/nurlansu/hugo-sustain/">sustain</a> with ♥</p>
+    </div>
+  </div>
+</footer>
+<div class="footer"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="../../js/docs.min.js"></script>
+<script src="../../js/main.js"></script>
+
+<script src="../../js/ie10-viewport-bug-workaround.js"></script>
+
+
+    
+  </body>
+</html>

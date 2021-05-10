@@ -1,0 +1,56 @@
+---
+title: R and Python
+author: Pragat Jay Muthu
+date: '2021-05-09'
+slug: r-and-python
+categories: []
+tags: []
+description: ''
+---
+```{r setup, include=FALSE}
+library(reticulate)
+library(tidyverse)
+library(nycflights13)
+library(ggplot2)
+py_install("pandas") 
+```
+
+Over the course of the semester, we have explored various different aspects of R including wrangling in [project 1](/project/project1/) and modeling in [project 2](/project/project2/) . Recently, we began to talk about python and its interactions with R. 
+
+
+Python is a general software development programming language that has evolved over time to included packages that allow it to do things that many other languages focus on like data science with R and website design with HTML. 
+![](/post/2021-05-09-r-and-python_files/python-logo-master-v3-TM-flattened.png)
+
+R on the other hand focuses on data science and statistical modeling.
+![](/post/2021-05-09-r-and-python_files/Rlogo.png)
+
+As we can see here, Python can do simple math.
+
+```{python}
+print(1+1)
+```
+
+So can R!
+
+```{R}
+1+1
+```
+
+Through the Reticulate package, we are able to communicate between R and python, transferring data seamlessly. 
+
+
+```{python}
+import pandas
+flights = pandas.read_csv("flights.csv")
+flights = flights[flights['dest']== "ORD"]
+flights = flights[['carrier', 'dep_delay', 'arr_delay']]
+flights = flights.dropna()
+```
+
+This imports a dataset using python and manipulates it. We can then use R to graph the data.
+
+```{R}
+ggplot(py$flights, aes(carrier, arr_delay)) + geom_point() + geom_jitter()
+```
+Overall, both python and R have their individual benefits, but using pacakges like reticulate can help bring both together!
+

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Projects on Pragat Jay Muthu</title>
+    <link>/project/</link>
+    <description>Recent content in Projects on Pragat Jay Muthu</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language><atom:link href="/project/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Project 1</title>
+      <link>/project/project1/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project1/</guid>
+      <description>Project 1 Introduction Currently, we are living in a world of open data. Alongside this, we are living in a pandemic. I was curious how I could access COVID-19 data and use it for this project. I was mainly curious to see the levels of cases and fatalities, especially in conjunction with the release of the vaccine and its recent access expansion. I would hopefully like to see a general decrease in cases as people become more careful and as more people get/recover from having it.</description>
+    </item>
+    
+    <item>
+      <title>Project 2: Modeling, Testing, and Predicting</title>
+      <link>/project/project2/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project2/</guid>
+      <description>Introduction The dataset I used comes from the package AES and is originating from the US National Medical Expenditure Survey done in 1987 and 1989. This survey targeted 4,406 individuals who are older than 65 years old (indicating that they are covered by Medicare) that were admitted to long term care facilities. It tracks 19 variables including the number of various types of visits per patient (which I have combined into one overall Total Healthcare Visits variable), alongside data such as their self-reported health, number of chronic conditions, disability, physical region, age, gender, education level, marriage, income, job status, insurance and medicaid status.</description>
+    </item>
+    
+  </channel>
+</rss>

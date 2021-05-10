@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on Pragat Jay Muthu</title>
+    <link>/post/</link>
+    <description>Recent content in Posts on Pragat Jay Muthu</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Sun, 09 May 2021 00:00:00 +0000</lastBuildDate><atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>R and Python</title>
+      <link>/post/2021/05/09/r-and-python/</link>
+      <pubDate>Sun, 09 May 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/2021/05/09/r-and-python/</guid>
+      <description>Over the course of the semester, we have explored various different aspects of R including wrangling in project 1 and modeling in project 2 . Recently, we began to talk about python and its interactions with R.
+Python is a general software development programming language that has evolved over time to included packages that allow it to do things that many other languages focus on like data science with R and website design with HTML.</description>
+    </item>
+    
+  </channel>
+</rss>

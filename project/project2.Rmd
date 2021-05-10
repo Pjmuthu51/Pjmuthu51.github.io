@@ -1,0 +1,360 @@
+---
+title: 'Project 2: Modeling, Testing, and Predicting'
+author: "PJM2773"
+date: '5/7/21'
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+hook_output = knit_hooks$get('output')
+knit_hooks$set(output = function(x, options) {
+  # this hook is used only when the linewidth option is not NULL
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    # any lines wider than n should be wrapped
+    if (any(nchar(x) > n)) x = strwrap(x, width = n)
+    x = paste(x, collapse = '\n')
+  }
+  hook_output(x, options)
+})
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE,fig.align="center",warning=FALSE,message=FALSE,fig.width=8, fig.height=5, linewidth=60)
+options(tibble.width = 100,width = 100)
+library(tidyverse)
+
+NMES1988.edited <- read.csv("~/my stuff/website/content/project/NMES1988-edited.csv")
+
+class_diag<-function(probs,truth){
+  
+  tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+  acc=sum(diag(tab))/sum(tab)
+  sens=tab[2,2]/colSums(tab)[2]
+  spec=tab[1,1]/colSums(tab)[1]
+  ppv=tab[2,2]/rowSums(tab)[2]
+
+  if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE) truth<-as.numeric(truth)-1
+  
+  #CALCULATE EXACT AUC
+  ord<-order(probs, decreasing=TRUE)
+  probs <- probs[ord]; truth <- truth[ord]
+  
+  TPR=cumsum(truth)/max(1,sum(truth)) 
+  FPR=cumsum(!truth)/max(1,sum(!truth))
+  
+  dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+  TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+  
+  n <- length(TPR)
+  auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+
+  data.frame(acc,sens,spec,ppv,auc)
+}
+
+library(sandwich)
+library(lmtest)
+select<-dplyr::select
+library(plotROC)
+library(glmnet)
+```
+
+### Introduction
+
+The dataset I used comes from the package AES and is originating from the US National Medical Expenditure Survey done in 1987 and 1989. This survey targeted 4,406 individuals who are older than 65 years old (indicating that they are covered by Medicare) that were admitted to long term care facilities. It tracks 19 variables including the number of various types of visits per patient (which I have combined into one overall Total Healthcare Visits variable), alongside data such as their self-reported health, number of chronic conditions, disability, physical region, age, gender, education level, marriage, income, job status, insurance and medicaid status. Overall, I would like to analyze the connections between these various personal characteristics with the amount of hospital visits that these patients take.
+
+### MANOVA
+
+```{R}
+
+Visits <- NMES1988.edited  %>% mutate(age = age *10) %>% select(8:21)
+
+#Manova
+MANOVA_dat <- manova(cbind(total.healthcare.visits, chronic, age, school, income)~health, data= Visits)
+summary(MANOVA_dat)
+```
+
+
+```{R}
+#univariate Anova
+summary.aov(MANOVA_dat)
+```
+*Since the MANOVA test shows that there is significance, univariate ANOVA's were done. These show that each variable tested (number of total healthcare visits, number of chronic conditions, age, years of education, and income) all show mean differences across various levels of health. When discussing the assumptions for the manova test, the data we have is random and independent, the data is linear between some variables, the data shouldn't have extreme outliers. When considering normality and equal variance, this data does not show that. This could mean that any conclusions gained from the MANOVA may be flawed.*
+```{R}
+#post-hoc
+pairwise.t.test(Visits$total.healthcare.visits,Visits$health, p.adj="none")
+pairwise.t.test(Visits$chronic,Visits$health, p.adj="none")
+pairwise.t.test(Visits$age,Visits$health, p.adj="none")
+pairwise.t.test(Visits$school,Visits$health, p.adj="none")
+pairwise.t.test(Visits$income,Visits$health, p.adj="none")
+```
+*When first doing post-hoc analysis, it shows that there are differences between all groups in all variables when using the original alpha of .05.*
+
+```{R}
+#prob of type I error
+1-(.95)^24
+
+#bon
+.05/ 24
+``` 
+*However, we did 1 MANOVA, 5 ANOVA's, and 3x5 post-hoc analyses. This means that the probability of one type I error is 0.708011. To reduce this, we will adjust the significance level using a bonferoni correction with a new alpha of 0.002083333.*
+
+```{R}
+#post-hoc- corrected
+pairwise.t.test(Visits$total.healthcare.visits,Visits$health, p.adj="none")$p.value<0.05/24
+pairwise.t.test(Visits$chronic,Visits$health, p.adj="none")$p.value<0.05/24
+pairwise.t.test(Visits$age,Visits$health, p.adj="none")$p.value<0.05/24
+pairwise.t.test(Visits$school,Visits$health, p.adj="none")$p.value<0.05/24
+pairwise.t.test(Visits$income,Visits$health, p.adj="none")$p.value<0.05/24
+
+# Perform a MANOVA testing whether any of your numeric variables (or a subset of them, if including them all is unreasonable or doesn't make sense) show a mean difference across levels of one of your categorical variables (3). If they do, perform univariate ANOVAs to find response(s) showing a mean difference across groups (3), and perform post-hoc t tests to find which groups differ (3). Discuss the number of tests you have performed, calculate the probability of at least one type I error (if unadjusted), and adjust the significance level accordingly (bonferroni correction) before discussing significant differences (3). Briefly discuss some of the MANOVA assumptions and whether or not they are likely to have been met here (no need for anything too in-depth) (2).
+
+``` 
+
+*When using the new p-value, we see that the comparison between average health and excellent health across income levels is no longer significant, while no other significant change.*
+
+### Randomization Test
+
+```{R}
+
+Visits %>% group_by(insurance) %>% count()
+
+set.seed(348)
+library(vegan)
+dists <- Visits%>%select(total.healthcare.visits, income)%>%dist
+adonis(dists~insurance,data=Visits)
+
+SST<- sum(dists^2)/4406
+SSW<-Visits%>%group_by(insurance)%>% select(insurance,total.healthcare.visits,income)%>%
+  do(d=dist(.[-1],"euclidean"))%>%ungroup()%>%
+  summarize(sum(d[[1]]^2)/985 + sum(d[[2]]^2)/3421)%>%pull
+
+F_obs<-((SST-SSW)/(2-1))/(SSW/(4406-2))
+
+Fstat<-replicate(100,{
+  new <- Visits%>%mutate(insurance=sample(insurance))
+  SSW <- new%>%group_by(insurance)%>%select(insurance,total.healthcare.visits, income)%>%
+    do(d=dist(.[-1],"euclidean"))%>%ungroup()%>%
+    summarize(sum(d[[1]]^2)/985 + sum(d[[2]]^2)/3421)%>%pull
+  ((SST-SSW)/1)/(SSW/4404)
+})
+
+{hist(Fstat,prob = T); abline(v=F_obs, col="blue", add=T)}
+mean(Fstat>F_obs)
+
+```
+*The null hypothesis is that mean total healthcare visits and mean income are equal across different levels of insurance(I.E yes insurance and no insurance). The alternative hypothesis is that mean total healthcare visits and mean income are not equal across different levels of insurance. To test this, we did a MANOVA in a randomization test. When looking at the results, it seems that the total healthcare visits and income are not equal across different levels of insurance, with a p value of .001.*
+
+
+### Linear Regression
+
+```{r}
+visits_lin <- Visits %>% mutate(cent_vis = total.healthcare.visits-mean(total.healthcare.visits), income_c= income- mean(income))
+
+fit <- lm(cent_vis ~ income_c*adl, data = visits_lin)
+
+summary(fit)
+
+ggplot(visits_lin, aes(x= income_c, y=cent_vis, group= adl)) + geom_smooth(method = "lm", aes(color=adl))
+```
+*We fit a linear regression model between the total healthcare visits and income across different ADLs. When looking at the model, we can see the individual predictors and their coefficient values. Intercept indicates that when one has an average income and is limited in activities of daily living, they will have about 2.5 more healthcare visits than the average. Further, when looking at income, for every 10 thousand dollars increase in family income, they will have 0.08814 less healthcare visits. This indicates that increases in income decreases healthcare visits. Similarly, when looking at individuals who are not limited in activites of daily living, they have 3.16195 less healthcare visits than individuals at average income with limitations. This makes sense as limitations usually indicate that someone has health issues that may require more visits. When looking at the interaction between ADLnormal and income, with every 10k increase in family income or a change in limitation status from limited to normal, there is a .129 increase in hospital visits. This was interesting as above we see that these kind of changes decrease number of hospital visits. Something about the interaction between the two changes this, which could be due to the lack of significance of income. This model does only explain about 1.07% of the variation in the total healthcare visits which may be improved with further addition of other variables or variables with more levels.*
+
+```{r}
+#assumptions
+
+#linearity
+ggplot(Visits) + geom_point(aes(x= income, y=total.healthcare.visits))
+
+#Residual normality
+residuals <- fit$residuals
+shapiro.test(residuals)
+
+#homoskedasticity
+bptest(fit)
+
+```
+*When looking at the assumptions, we will focus on linearity, residual normality and homoskedasticity. A scatterplot of the data does not show linearity. This could potentially be improved with a logarithmic transformation of the data. For residual normality, we did a shapiro-wilkes test that showed significance indicating that it is not normal. Finally, for homoskedasticity, we ran a BP test that indicated that the assumption of homoskedasticity was met.*
+
+```{R}
+summary(fit)$coef
+coeftest(fit, vcov = vcovHC(fit))
+```
+*When re-running the regression using robust standard errors, we see very little change in the coefficients. However, we do see some changes in the standard errors. The intercept SE increases, corresponding to an increase in P-value. The income_c SE decreases, corresponding to an decrease in P-value. The adlnormal SE increases, corresponding to an increase in P-value. Finally, the SE for the interaction between income_c and ADLnormal decreases which corresponds to a decrease in p-value.*
+
+### Bootstrapped Linear Regression 
+
+```{r}
+set.seed(348)
+  fit2<-lm(cent_vis ~ income_c*adl, data = visits_lin)
+  resids<-fit2$residuals
+  fitted<-fit2$fitted.values 
+  
+  resid_resamp<-replicate(5000,{
+    new_resids<-sample(resids,replace=TRUE)
+    visits_lin$new_cent_vis<-fitted+new_resids 
+    fit2<-lm(new_cent_vis~income_c*adl, data=visits_lin)
+    coef(fit2)
+})
+  
+resid_resamp%>%t%>%as.data.frame%>%summarize_all(sd)%>%pivot_longer(1:4,names_to = "Coefficient", values_to = "Bootstrapped SE")
+
+#non-bootstrap robust SE
+coeftest(fit, vcov = vcovHC(fit))
+
+#non-bootstrap SE
+summary(fit)$coef
+```
+*When re-running the linear model with bootstrapped SE's, there are slight differences. The bootstrapped SE's are closer to the non-robust SE's. Specifically, the intercept for the bootstrapped SE is .414, which is closer to the npn-robust SE of .417 vs the robust model's .446. This trend continues with each of the coefficients, indicating that the bootstrapped values potentially have p values closer to the non-robust model's coefficient's p values.*
+
+### Logistic model
+
+```{r}
+data <- Visits %>% mutate(y = recode(medicaid, "yes" = 1, "no" = 0)) %>% mutate(school_c = school-mean(school), income_c= income- mean(income))
+
+limlog<-glm(y~income_c+school_c, data=data, family=binomial)
+summary(limlog)
+
+
+exp(coeftest(limlog))
+
+```
+*When creating a logistic model for if someone has medicaid based off of income and number of years of education, we get an intercept reference group of individuals with average education and average family income. To interpret the coefficients, we exponetiated each one. When looking at income, we see that for every 10k above average income one has, there is about a 45.5% decrease in odds of having medicaid. This makes sense as medicaid is a healthcare insurance program for low income individuals. Similarly, for every year of education above average, there is about a 19.17% decrease in odds of having medicaid. This also makes sense as income usually increases with increased education, but this is not a guarantee.*
+
+```{R}
+#confusion matrix
+
+data$prob <- predict(limlog,type="response")
+data$predicted <- ifelse(data$prob>.5,"No Medicaid","Yes Medicaid")
+table(truth=data$y, prediction=data$predicted)%>%addmargins
+
+#class diag
+
+class_diag(data$prob,data$y)
+```
+*The class diag function returns the accuracy, sensitivity, specificity, and precision. The accuracy value of .91 indicates that 91% of the time we will get an accurate prediction. However, the low sensitivity of .04 indicates that this model is not good at predicting individuals who do have medicaid. This makes sense as medicaid is not just based off of income which is one of the variables that was fed into the model. This model is good at predicting if they don't have medicaid with a specificity of .994, while the PPV is lower at .385. Overall, according to the AUC, this model is good at an auc of .818.*
+
+```{R}
+#density plot
+
+data$logit<-predict(limlog)
+
+ggplot(data,aes(logit, fill=y))+geom_density(alpha=.3)+geom_rug(aes(logit,color=y))+
+  geom_vline(xintercept=0,lty=2)+theme(legend.position=c(.2,.8))+xlab("logit (log-odds)")
+
+
+data %>% mutate(y=as.factor(medicaid)) %>% ggplot() + geom_density(aes(logit, fill=y)) + geom_vline(xintercept=0)+xlab("predictor (logit)")
+```
+*There are two density plots as I used one method we have used previously but no matter what I tweaked, I did not get a density plot that we saw previously. This graph shows that some of the points may be very rare and have *
+```{R}
+#ROC
+ROCplot<-ggplot(data)+geom_roc(aes(d=y,m=prob), n.cuts=0)+geom_segment(aes(x=0,y=0,xend=1,yend=1),lty=2)+xlab("FPR")+ylab("TPR")
+ROCplot
+
+calc_auc(ROCplot)
+```
+*The AUC calculated here matched the AUC calculated by the Class Diag essentially confirming that this model is a good model of predicting medicaid from income and education with an AUC of .8179.*
+
+### Logistic model (All variables)
+
+```{R}
+#model
+
+data2 <- Visits %>% mutate(y = recode(medicaid, "yes" = 1, "no" = 0), insurance = recode(insurance, "yes" = 1, "no" = 0), afam= recode(afam, "yes" = 1, "no" = 0), adl = recode(adl, "limited" = 1, "normal" = 0), married = recode(married, "yes" = 1, "no" = 0), employed = recode(employed, "yes" = 1, "no" = 0)) %>% mutate(school_c = school-mean(school), income_c= income- mean(income), age_c= age- mean(age), chronic_c= chronic- mean(chronic), cent_vis = total.healthcare.visits-mean(total.healthcare.visits))
+
+log<-glm(y~income_c+school_c+chronic_c+age_c+cent_vis+health+adl+region+afam+gender+married+employed+insurance, data=data2, family=binomial)
+summary(log)
+
+
+```
+
+
+```{R}
+data2$prob <- predict(log,type="response")
+
+class_diag(data2$prob,data2$y)
+```
+*The class diag function for the full set of variables returns the accuracy, sensitivity, specificity, and precision. The accuracy value of .927 indicates that 92.7% of the time we will get an accurate prediction of medicaid based off of all of the variables. This is slightly better than using the limited variables in the first logistical model. The sensitivity has also improved significantly from .04 to .438, which indicates this model is much better at predicting individuals who do have medicaid. However, this is still below .5. The specificity has reduced a bit from .994 to .976, showing that it is slightly worse at predicting who doesn't have medicaid but it is still very good. The ppv has improved significantly from .385 to now .647. Overall, according to the AUC, this model is great at an auc of .927 which is better than the other model with an AUC of .8179. This is most likely because of the incorporation of all the other variables improving sensitivity.*
+
+```{R}
+#10-fold
+
+set.seed(348)
+k=10
+dat<-data2[sample(nrow(data2)),] 
+folds<-cut(seq(1:nrow(data2)),breaks=k,labels=F)
+diags<-NULL
+for(i in 1:k){
+  train<-dat[folds!=i,] 
+  test<-dat[folds==i,]
+  
+  truth<-test$y
+  
+  fit3<-glm(y~income_c+school_c+chronic_c+age_c+cent_vis+health+adl+region+afam+gender+married+employed+insurance, data=train, family=binomial)
+  
+  probs<-predict(fit3,newdata = test,type="response")
+  
+  diags<-rbind(diags,class_diag(probs,truth))
+}
+summarize_all(diags,mean)
+
+```
+*When performing 10-fold CV, overall the metrics of the model are very similar. Accuracy in 10 fold is .925 as compared to .927, sens is .428 vs .438, spec is .975 vs .976, and ppv is .635 vs .647. Overall, 10-fold cv seems to reduce the metric be a bit, which is reflected in its AUC being .9222 vs the non-10-fold AUC of .927.*
+
+
+
+```{R}
+#lasso
+data3 <- data2
+data3$health <- factor(data3$health)
+data3$region <- factor(data3$region)
+
+set.seed(348)
+y<-as.matrix(data3$y)
+x<-model.matrix(y~income_c+school_c+chronic_c+age_c+cent_vis+health+adl+region+afam+gender+married+employed+insurance,data=data3)[,-1]
+x<-scale(x)
+cv<-cv.glmnet(x,y, family= "binomial")
+lasso<-glmnet(x,y,family="binomial",lambda=cv$lambda.1se)
+
+coef(lasso)
+
+```
+*When doing a LASSO to retain the most important variables, we see age, employment status, excellent health status, and regions northeast and other being removed. I was surprised that age was removed however, could understand if its effects were monitorable in other variables such as health poor and chronic conditions. Similarly with employment status, I could see its effects on medicaid status being found in income. I was surprised that two but not all regions were removed. This could be that it is significant if you are in the west on medicaid status. Similarly with health excellent, it could mean that it does not matter if you are in excellent health as compared to average, but poor health matters.*
+
+
+
+```{R}
+#lasso 10-fold
+
+data3 <-data3 %>% mutate(healthpoor=ifelse(data3$health=="poor",1,0), west=ifelse(data3$region=="west",1,0))
+
+set.seed(348)
+k=10
+dat<-data3[sample(nrow(data3)),] 
+folds<-cut(seq(1:nrow(data3)),breaks=k,labels=F)
+diags<-NULL
+for(i in 1:k){
+  train<-dat[folds!=i,] 
+  test<-dat[folds==i,]
+  
+  truth<-test$y
+  
+  fit4<-glm(y~income_c+school_c+chronic_c+cent_vis+healthpoor+adl+west+afam+gender+married+insurance, data=train, family=binomial)
+  
+  probs<-predict(fit4,newdata = test,type="response")
+  
+  diags<-rbind(diags,class_diag(probs,truth))
+}
+summarize_all(diags,mean)
+
+```
+*When pulling out the variables and levels lasso said were not significant, the AUC slightly increased from 0.9221913 to 0.9219326. This was probably due to slight increases and decreases in other metrics. Overall, this probably means that the original model was still pretty good and not overfitting too much.*
+
+
+
+### Conclusion 
+
+*In conclusion, when analyzing various different interactions between different personal characteristics(I.E health, age, income, etc), we can create a model of the most pertinent characteristics to determine if someone is on medicaid or not. I would like to further this model by adding in other variables that determine medicaid eligibility, such as citizenship, number of children, SSI status, and more, to hopefully create a model that could more accurately predict medicaid status. Using this same data, it would be interesting to create a model for number of healthcare visits as that could also help individuals in budgeting for their upcoming year. Overall, this was an interesting project and I was glad to get significant results as last project I felt as if my results were not as interesting. Thank you again Professor for a great semester!*
